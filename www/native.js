@@ -27,7 +27,7 @@
     var ks = Object.keys(dirty); dirty = {};
     for (var i = 0; i < ks.length; i++) {
       var k = ks[i];
-      if (k in mem) localStorage.setItem('enc_' + k, await enc(JSON.stringify(mem[k])));
+      if (k in mem) { try { localStorage.setItem('enc_' + k, await enc(JSON.stringify(mem[k]))); } catch (e) { N.storageFull = true; say('Storage is full. Delete old documents or sync to Drive.'); } }
     }
   }
   window.SEC = {
@@ -77,6 +77,7 @@
   }
   function lock() { if (typeof S === 'undefined' || !S.get('vw_bio')) return; overlay().style.display = 'flex'; locked = true; unlock(); }
   N.bootLock = lock;
+  N.verifyOwner = function () { return BA.authenticate({ reason: 'Confirm it is you to reset your password', allowDeviceCredential: true, androidTitle: 'Reset password', androidSubtitle: 'Confirm it is you' }); };
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { hiddenAt = Date.now(); if (window.SEC && SEC.on) SEC.flushNow(); }
     else if (typeof S !== 'undefined' && S.get('vw_bio') && !locked && Date.now() - hiddenAt > 30000) lock();
