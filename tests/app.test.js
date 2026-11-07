@@ -15,7 +15,7 @@ function load(native) {
     beforeParse(w) {
       Object.defineProperty(w, 'crypto', { value: webcrypto });
       w.TextEncoder = TextEncoder; w.TextDecoder = TextDecoder; w.Uint8Array = Uint8Array;
-      w.matchMedia = () => ({ matches: false }); w.addEventListener('unhandledrejection', e => console.log('   rejected:', String(e.reason && e.reason.stack || e.reason).slice(0, 300)));
+      w.matchMedia = () => ({ matches: false }); w.Element.prototype.scrollIntoView = function () {}; w.addEventListener('unhandledrejection', e => console.log('   rejected:', String(e.reason && e.reason.stack || e.reason).slice(0, 300)));
       w.VV_CONFIG = { googleWebClientId: 'x.apps.googleusercontent.com' };
       if (native) w.VVP = { native: true,
         SecureStorage: { get: async k => secure[k] || null, set: async (k, v) => { secure[k] = v; } },
@@ -75,6 +75,30 @@ function load(native) {
   });
   await t('graphics: each Discover section draws its own illustration', async () => {
     for (const k of ['launch', 'cars', 'bikes', 'ev', 'ins']) { w.eval("st.tab='discover';st.dk='" + k + "';st.ds=0;draw()"); ok(/<svg[^>]*aria-label=["'][a-zA-Z]+ illustration["']/.test(app()), 'illustration in ' + k); }
+  });
+
+  await t('custom form needs a category name', async () => {
+    w.eval("st.user='a@b.com';st.tab='add';st.cat='custom';st.editId=null;draw()"); ok(/Category name/.test(app()) && /House rent/.test(app()), 'category field with example');
+    w.document.getElementById('f_name').value = 'Flat 2B rent'; w.eval('saveRec()'); ok(/Required/.test(w.document.getElementById('e_cat').textContent), 'category required');
+  });
+  await t('each custom category gets its own sheet with its own columns', async () => {
+    w.eval(`S.set('vw_r_a@b.com',[{id:'c1',c:'custom',d:{cat:'House rent',name:'Flat 2B',note:'',expiry:'2026-12-01',extra:{'Rent amount':'18000','Landlord':'Mr Rao'}},created:'2026-11-01 09:00',edited:null,docs:[]},{id:'c2',c:'custom',d:{cat:'House rent',name:'Flat 3C',note:'',expiry:'',extra:{'Rent amount':'12000'}},created:'2026-11-02 09:00',edited:null,docs:[]},{id:'c3',c:'custom',d:{cat:'Gym',name:'Membership',note:'annual',expiry:'2027-03-01',extra:{'Fee':'9000'}},created:'2026-11-03 09:00',edited:null,docs:[]}])`);
+    const sh = w.eval('driveData()').sheets, keys = Object.keys(sh);
+    ok(keys.includes('Custom|House rent') && keys.includes('Custom|Gym'), 'sheet per category: ' + keys.join());
+    ok(!keys.includes('Custom'), 'no single mixed Custom sheet');
+    const head = sh['Custom|House rent'].split('\r\n')[0]; ok(/Rent amount/.test(head) && /Landlord/.test(head) && !/Fee/.test(head), head);
+    ok(/Fee/.test(sh['Custom|Gym'].split('\r\n')[0]) && !/Rent amount/.test(sh['Custom|Gym']));
+    w.eval("st.tab='records';st.sheet=1;draw()"); const h = app(); ok(/Custom · House rent/.test(h) && /Custom · Gym/.test(h), 'sheet view headings'); ok(/Landlord/.test(h) && /Mr Rao/.test(h));
+    w.eval("st.sheet=0;draw()"); ok(/Custom · House rent/.test(app()), 'card shows category');
+    const items = w.eval('remItems(recs())'); ok(items.some(x => /Custom · House rent: Flat 2B/.test(x.title)), 'reminder names the category');
+  });
+  await t('feedback is saved and prepared as an email to the support inbox', async () => {
+    w.eval("st.tab='fb';draw()"); w.document.getElementById('tm').value = 'The camera button did not open on my phone.'; w.eval('sendTk()');
+    const tk = w.eval("S.get('vw_tk_a@b.com')")[0]; ok(/^VV-\d{4}$/.test(tk.id) && tk.status === 'Sent' && tk.uid === 'a@b.com');
+    ok(w.eval('SUPPORT') === 'allinoneaideveloper2026@gmail.com'); ok(/opens in your email app/.test(app()));
+  });
+  await t('About shows the owner, no prototype wording, and builds as an Android app', async () => {
+    w.eval("st.tab='about';draw()"); const h = app(); ok(/allinoneaideveloper2026/.test(h) && /allinoneaideveloper2026@gmail\.com/.test(h), 'owner and email'); ok(!/prototype/i.test(h), 'no prototype text'); ok(/VeloDVault is an Android app/.test(h)); ok(!/\[/.test(h.replace(/<[^>]*>/g, '')), 'no placeholders left in About');
   });
 
   console.log('Web mode (browser)');

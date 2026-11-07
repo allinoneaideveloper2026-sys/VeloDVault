@@ -196,7 +196,10 @@
     ids.state = await upl('state.json', ids.f._app, 'application/json', JSON.stringify({ app: 'VeloDVault', v: 1, savedAt: savedAt, records: clean, bin: data.bin || [] }), ids.state);
     ids.sheets = ids.sheets || {};
     var names = Object.keys(data.sheets || {});
-    for (i = 0; i < names.length; i++) ids.sheets[names[i]] = await upl(names[i], ids.f[names[i]], 'text/csv', data.sheets[names[i]], ids.sheets[names[i]], 'application/vnd.google-apps.spreadsheet');
+    for (i = 0; i < names.length; i++) {
+      var parts = names[i].split('|'), title = parts[1] ? parts[0] + ' - ' + parts[1] : parts[0];
+      ids.sheets[names[i]] = await upl(title, ids.f[parts[0]], 'text/csv', data.sheets[names[i]], ids.sheets[names[i]], 'application/vnd.google-apps.spreadsheet');
+    }
     S.set(key, ids); S.set('vw_lastsync_' + user, savedAt);
     return savedAt;
   }

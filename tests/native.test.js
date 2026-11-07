@@ -33,7 +33,7 @@ globalThis.VV_CONFIG = { googleWebClientId: 'abc.apps.googleusercontent.com' };
 globalThis.S = { get: k => SEC.get(k), set: (k, v) => SEC.set(k, v), del: k => SEC.del(k) };
 globalThis.st = { user: 'tester@gmail.com' };
 globalThis.toast = () => {}; globalThis.draw = () => {}; globalThis.modal = () => {}; globalThis.closeM = () => {};
-globalThis.driveData = () => ({ records: S.get('vw_r_tester@gmail.com') || [], bin: [], sheets: { Vehicle: 'a,b\r\n1,2' } });
+globalThis.driveData = () => ({ records: S.get('vw_r_tester@gmail.com') || [], bin: [], sheets: { Vehicle: 'a,b\r\n1,2', 'Custom|House rent': 'x,y\r\n1,2' } });
 
 eval(fs.readFileSync(path.join(__dirname, '../www/native.js'), 'utf8'));
 const N = window.NATIVE;
@@ -120,6 +120,8 @@ const N = window.NATIVE;
     const state = ups.find(c => /"app":"VeloDVault"/.test(c.b)); assert.ok(state, 'state file uploaded');
     assert.ok(!/QUJD/.test(state.b), 'document bytes are not duplicated inside the state file');
     const sheet = ups.find(c => /vnd.google-apps.spreadsheet/.test(c.b)); assert.ok(sheet, 'sheet converted from CSV');
+    const cs = ups.find(c => /"name":"Custom - House rent"/.test(c.b)); assert.ok(cs, 'custom category sheet is named Custom - House rent');
+    const parent = JSON.parse(cs.b.split('\r\n\r\n')[1].split('\r\n')[0]).parents[0]; assert.strictEqual(created[parent].name, 'Custom', 'custom sheet sits in the Custom folder');
     assert.strictEqual(S.get('vw_drvstat_tester@gmail.com').ok, true);
     assert.ok(S.get('vw_r_tester@gmail.com')[0].docs[0].driveId, 'drive id remembered');
   });
