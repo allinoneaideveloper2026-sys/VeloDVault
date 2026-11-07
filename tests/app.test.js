@@ -52,12 +52,42 @@ function load(native) {
     const items = w.eval('remItems(recs())'); ok(items.length === 1 && /Insurance: Car/.test(items[0].title));
   });
 
+  await t('password field has a show/hide button that works', async () => {
+    w.eval("st.user=null;st.mode='signin';draw()"); const pw = w.document.getElementById('pw');
+    ok(pw.type === 'password' && w.document.getElementById('pwt'), 'button present'); w.eval("togglePw('pw','pwt')"); ok(w.document.getElementById('pw').type === 'text'); ok(w.document.getElementById('pwt').textContent === 'Hide');
+    w.eval("togglePw('pw','pwt')"); ok(w.document.getElementById('pw').type === 'password');
+  });
+  await t('forgot password: phone lock check, then a new password works and the old one does not', async () => {
+    w.document.getElementById('em').value = 'a@b.com'; await w.eval('forgot()');
+    ok(/Set a new password/.test(w.document.getElementById('mod').innerHTML), 'reset dialog shown');
+    w.document.getElementById('np').value = 'short'; await w.eval('setNewPw()'); ok(/at least 8/.test(w.document.getElementById('mod').innerHTML), 'short password refused');
+    w.document.getElementById('np').value = 'brandnewpass9'; await w.eval('setNewPw()');
+    w.document.getElementById('em').value = 'a@b.com'; w.document.getElementById('pw').value = 'longpassword1'; await w.eval('emailAuth2()'); ok(!w.eval('st.user'), 'old password refused');
+    w.document.getElementById('pw').value = 'brandnewpass9'; await w.eval('emailAuth2()'); await wait(() => w.eval('st.user') === 'a@b.com');
+    ok(w.eval("S.get('vw_r_a@b.com')").length === 1, 'records kept');
+  });
+  await t('forgot password for an unknown email asks for a registered email', async () => {
+    w.eval("st.user=null;draw()"); w.document.getElementById('em').value = 'nobody@x.com'; await w.eval('forgot()'); ok(/registered email/.test(w.document.getElementById('app').innerHTML));
+  });
+  await t('document screen offers Take photo (camera) and Choose file', async () => {
+    w.eval("st.user='a@b.com';st.tab='add';st.cat='vehicle';draw()"); const h = app();
+    ok(/Take photo/.test(h) && /capture="environment"/.test(h), 'camera input'); ok(/Choose file/.test(h) && /application\/pdf/.test(h), 'file input');
+  });
+  await t('graphics: each Discover section draws its own illustration', async () => {
+    for (const k of ['launch', 'cars', 'bikes', 'ev', 'ins']) { w.eval("st.tab='discover';st.dk='" + k + "';st.ds=0;draw()"); ok(/<svg[^>]*aria-label=["'][a-zA-Z]+ illustration["']/.test(app()), 'illustration in ' + k); }
+  });
+
   console.log('Web mode (browser)');
   const d2 = load(false), w2 = d2.window;
   await t('web build has no fake Google login and no testing tools', async () => {
     await wait(() => w2.document.getElementById('app').innerHTML.length > 100);
     const h = w2.document.getElementById('app').innerHTML;
     ok(/available in the Android app/.test(h)); ok(!/demo\.user@gmail/.test(h)); ok(w2.eval('TESTING') === false);
+  });
+  await t('web forgot password explains there is no email reset and offers to erase', async () => {
+    w2.eval("S.set('vw_users',{'x@y.com':{salt:'s',h:'h'}});st.user=null;draw()"); w2.document.getElementById('em').value = 'x@y.com'; await w2.eval('forgot()');
+    const m = w2.document.getElementById('mod').innerHTML; ok(/no email we can send/.test(m) && /Erase this account/.test(m));
+    w2.eval("askErase()"); w2.document.getElementById('dc').value = 'DELETE'; w2.eval('eraseAcc()'); ok(!w2.eval("S.get('vw_users')")['x@y.com'], 'account erased');
   });
   console.log('\n' + passed + ' checks passed' + (process.exitCode ? ', with failures' : ''));
   process.exit(process.exitCode || 0);
