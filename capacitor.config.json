@@ -1,0 +1,26 @@
+{
+  "appId": "com.yourname.velodvault",
+  "appName": "VeloDVault",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_name",
+      "iconColor": "#5B4BF0"
+    },
+    "SocialLogin": {
+      "providers": {
+        "google": true,
+        "facebook": false,
+        "apple": false,
+        "twitter": false
+      },
+      "logLevel": 1
+    }
+  }
+}
