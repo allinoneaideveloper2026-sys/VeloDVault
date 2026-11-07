@@ -19,7 +19,7 @@ Answers must match the final build. Update when Google sign-in, analytics or not
 | Privacy policy URL | https://[YOUR-DOMAIN]/privacy.html | |
 
 ## Permissions the app requests
-INTERNET, POST_NOTIFICATIONS (local reminders), USE_BIOMETRIC (app lock), RECEIVE_BOOT_COMPLETED (restore reminders after restart). No location, contacts, camera or microphone permission.
+INTERNET, CAMERA (only when the user taps Take photo to capture a document; photos are not sent to us), POST_NOTIFICATIONS (local reminders), USE_BIOMETRIC (app lock), RECEIVE_BOOT_COMPLETED (restore reminders after restart). No location, contacts or microphone permission.
 
 ## Other answers
 Backups: app data excluded from cloud and device backups. Encryption at rest: yes (Android Keystore). Screenshots blocked in release builds.
