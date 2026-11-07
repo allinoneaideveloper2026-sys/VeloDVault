@@ -10,7 +10,7 @@ jobs:
           keytool -genkeypair -v -keystore upload.keystore -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass "$PASS" -keypass "$PASS" -dname "CN=VeloDVault, O=VeloDVault, C=IN"
           base64 -w0 upload.keystore > keystore.b64
           printf "ANDROID_KEYSTORE_PASSWORD=%s\nANDROID_KEY_PASSWORD=%s\nANDROID_KEY_ALIAS=upload\n" "$PASS" "$PASS" > keystore-info.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: upload-key-DELETE-AFTER-USE
           retention-days: 1
