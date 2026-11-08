@@ -24,7 +24,7 @@ t('search engines are told to skip /app/', () => { ok(/\/app\/\*\s+X-Robots-Tag:
 t('page has language, title and a skip link (accessibility)', () => { const h = html('index.html'); ok(/<html lang="en"/.test(h) && /<title>/.test(h) && /class="skip"/.test(h)); });
 t('claims on the landing page stay within what is true today', () => { const h = html('index.html').toLowerCase(); ['100% private', 'unhackable', 'no cloud', 'government approved', 'real time'].forEach(w => ok(!h.includes(w), 'avoid: ' + w)); });
 run('--with-app');
-t('with the switch on, the web app is included under /app/', () => { ok(fs.existsSync(path.join(site, 'app/index.html')) && fs.existsSync(path.join(site, 'app/sw.js'))); });
+t('with the switch on, the web app is included under /app/', () => { const miss = ['app/index.html', 'app/native.js', 'app/vv-plugins.js', 'app/sw.js'].filter(f => !fs.existsSync(path.join(site, f))); ok(!miss.length, 'missing from the web app copy: ' + miss.join(', ') + ' (check the www folder in the repository)'); });
 run('');
 console.log('\n' + passed + ' checks passed' + (failed ? ', ' + failed + ' failed' : ''));
 process.exit(failed ? 1 : 0);
