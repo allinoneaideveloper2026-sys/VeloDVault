@@ -7,6 +7,10 @@ const ok = (c, m) => { if (!c) throw new Error(m || 'assertion failed'); };
 const run = a => execSync('node scripts/build-site.js ' + a, { cwd: root, stdio: 'pipe' });
 const html = f => fs.readFileSync(path.join(site, f), 'utf8');
 
+t('build sources do not live in hidden (dot) folders, which web uploads can skip', () => {
+  const bad = []; const walk = d => fs.readdirSync(d, { withFileTypes: true }).forEach(e => { const p = path.join(d, e.name); if (e.isDirectory()) { if (e.name.startsWith('.')) bad.push(path.relative(root, p)); else walk(p); } });
+  ['site-src', 'www', 'scripts', 'tests'].forEach(d => walk(path.join(root, d))); ok(!bad.length, 'hidden folders found: ' + bad.join(', '));
+});
 run('');
 t('site has the landing page and every policy page', () => ['index.html', 'privacy.html', 'terms.html', 'delete-account.html', 'grievance.html', 'security.html', '.well-known/security.txt', 'robots.txt', '_headers'].forEach(f => ok(fs.existsSync(path.join(site, f)), 'missing ' + f)));
 t('web app is not published by default', () => { ok(!fs.existsSync(path.join(site, 'app')), 'app folder present'); ok(!/href="[^"]*app\//.test(html('index.html')), 'landing links to the app'); });
