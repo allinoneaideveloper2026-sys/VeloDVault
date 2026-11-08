@@ -6,7 +6,8 @@
   "scripts": {
     "build:web": "esbuild src/plugins.js --bundle --minify --format=iife --target=es2020 --outfile=www/vv-plugins.js",
     "sync": "npm run build:web && cap sync android",
-    "test": "node tests/native.test.js"
+    "test": "node tests/native.test.js && node tests/site.test.js",
+    "build:site": "node scripts/build-site.js"
   },
   "keywords": [],
   "author": "",

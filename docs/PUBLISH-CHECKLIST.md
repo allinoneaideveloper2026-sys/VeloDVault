@@ -7,13 +7,15 @@ Items marked OWNER need you; the rest are in this package.
 - [ ] OWNER: trademark search for VeloDVault on the official registry.
 - [ ] Confirm TESTING is false (it is in this build).
 
-## Hosting (use Cloudflare Pages, free: it applies the _headers file)
-- [ ] OWNER: create a free Cloudflare account, Workers & Pages, Create, Pages, Upload assets, upload the whole folder.
-- [ ] Turn on HTTPS only and "Always use HTTPS".
-- [ ] Open the site, More, Security: content policy should show Active.
-- [ ] Check https://securityheaders.com shows A or better for your address.
-- [ ] Put your real domain in .well-known/security.txt and privacy page links.
-(GitHub Pages also works but cannot apply the security headers; the content policy tag in index.html still applies.)
+## Website (free, Cloudflare Pages): public pages for Google Play
+- [ ] OWNER: Cloudflare account > Workers & Pages > Create > Pages > Connect to Git > pick the private repo.
+- [ ] Build command: `node scripts/build-site.js`   Build output directory: `site`
+- [ ] The site holds only the landing page and the policy pages. The web version of the app is NOT published.
+- [ ] Use in Play Console: privacy policy `https://YOUR-SITE/privacy.html`, account deletion `https://YOUR-SITE/delete-account.html`.
+- [ ] Optional: in the Pages project settings add a variable SITE_URL with your site address so security.txt lists the security page.
+- [ ] Renew the Expires date in www/.well-known/security.txt every year.
+- [ ] Check https://securityheaders.com for your address (the _headers file sets the security headers).
+- [ ] To publish the web version later as an unlisted preview at /app/: change the build command to `node scripts/build-site.js --with-app`. It stays out of search engines. Add Google web sign-in before promoting it.
 
 ## Google Play
 - [ ] OWNER: Play Console account.
