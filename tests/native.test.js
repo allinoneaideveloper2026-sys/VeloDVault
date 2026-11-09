@@ -93,6 +93,20 @@ const N = window.NATIVE;
   });
   await t('turning off cancels everything', async () => { await N2.toggleRem(); assert.strictEqual(S.get('vw_rem'), false); assert.strictEqual(pending.length, 0); });
 
+  console.log('Email verification');
+  await t('verifies only the matching Google account, and says why when not', async () => {
+    const origLogin = VVP.SocialLogin.login; let mail = 'tester@gmail.com'; VVP.SocialLogin.login = async () => ({ result: { profile: { email: mail } } });
+    assert.strictEqual(await N2.verifyEmail('Tester@Gmail.com'), true);
+    mail = 'other@gmail.com'; await assert.rejects(() => N2.verifyEmail('tester@gmail.com'), e => e.message === 'MISMATCH' && e.got === 'other@gmail.com');
+    mail = ''; await assert.rejects(() => N2.verifyEmail('tester@gmail.com'), e => e.message === 'NOTOKEN');
+    VV_CONFIG.googleWebClientId = 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com'; await assert.rejects(() => N2.verifyEmail('tester@gmail.com'), e => e.message === 'SETUP'); VV_CONFIG.googleWebClientId = 'abc.apps.googleusercontent.com';
+    VVP.SocialLogin.login = origLogin;
+  });
+  console.log('Connect Drive for email accounts');
+  await t('connecting Drive marks the signed-in email account for sync (the Google account can differ)', async () => {
+    const keep = st.user; st.user = 'sam@example.com'; S.set('vw_r_sam@example.com', []);
+    await N2.connectDrive(); assert.strictEqual(S.get('vw_gmode_sam@example.com'), true); st.user = keep;
+  });
   console.log('Lock');
   await t('lock turns on only after the phone confirms the owner', async () => { authOk = false; await N2.toggleBio(); assert.ok(!S.get('vw_bio')); authOk = true; await N2.toggleBio(); assert.strictEqual(S.get('vw_bio'), true); });
 

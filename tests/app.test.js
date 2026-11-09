@@ -6,8 +6,28 @@ async function t(n, f) { try { await f(); passed++; console.log('  ok  ' + n); }
 const ok = (c, m) => { if (!c) throw new Error(m || 'assertion failed'); };
 const wait = (f, ms) => new Promise((res, rej) => { const s = Date.now(); (function p() { try { if (f()) return res(); } catch (e) {} if (Date.now() - s > (ms || 4000)) return rej(new Error('timeout waiting')); setTimeout(p, 30); })(); });
 
-function load(native) {
-  const html = W('index.html').replace('<script src="vv-plugins.js"></script>', '').replace('<script src="config.js"></script>', '').replace('<script src="native.js"></script>', native ? '<script>' + W('native.js') + '</script>' : '');
+
+function makeFirebase() {
+  const db = {}; let cur = null; const cbs = []; const sent = { verify: [], reset: [] }; let deleted = [];
+  const err = c => Object.assign(new Error(c), { code: c });
+  const user = r => ({ email: r.email, uid: r.uid, get emailVerified() { return r.verified; }, reload: async () => {} });
+  const notify = () => cbs.forEach(f => f(cur ? user(cur) : null));
+  const F = {
+    initializeApp: c => ({ c }), initializeAuth: () => ({ get currentUser() { return cur ? user(cur) : null; } }), indexedDBLocalPersistence: 1, browserLocalPersistence: 2,
+    createUserWithEmailAndPassword: async (a, e, p) => { if (db[e]) throw err('auth/email-already-in-use'); db[e] = { email: e, pw: p, verified: false, uid: 'u' + (Object.keys(db).length + 1) }; cur = db[e]; notify(); return { user: user(cur) }; },
+    signInWithEmailAndPassword: async (a, e, p) => { if (!db[e] || db[e].pw !== p) throw err('auth/invalid-credential'); cur = db[e]; notify(); return { user: user(cur) }; },
+    sendEmailVerification: async u => { sent.verify.push(u.email); },
+    sendPasswordResetEmail: async (a, e) => { sent.reset.push(e); },
+    signOut: async () => { cur = null; notify(); },
+    onAuthStateChanged: (a, cb) => { cbs.push(cb); setTimeout(() => cb(cur ? user(cur) : null), 0); return () => {}; },
+    deleteUser: async u => { deleted.push(u.email); delete db[u.email]; cur = null; notify(); },
+    reauthenticateWithCredential: async (u, c) => { if (db[u.email].pw !== c.pw) throw err('auth/invalid-credential'); },
+    EmailAuthProvider: { credential: (email, pw) => ({ email, pw }) }
+  };
+  return { F, db, sent, deleted, verify: e => { db[e].verified = true; }, remoteSignOut: () => { cur = null; notify(); } };
+}
+function load(native, fbmock) {
+  const html = W('index.html').replace('<script src="vv-plugins.js"></script>', '').replace('<script src="firebase-config.js"></script>', fbmock ? '<script>window.VV_FIREBASE={apiKey:"k",authDomain:"x.firebaseapp.com",projectId:"p",appId:"a"}</script>' : '<script>' + W('firebase-config.js') + '</script>').replace('<script src="fbauth.js"></script>', '<script>' + W('fbauth.js') + '</script>').replace('<script src="config.js"></script>', '').replace('<script src="native.js"></script>', native ? '<script>' + W('native.js') + '</script>' : '');
   const secure = {};
   const vc = new VirtualConsole(); vc.on('jsdomError', e => { if (!/scrollTo/.test(e.message)) console.log('   page error:', e.message.slice(0, 220)); });
   return new JSDOM(html, {
@@ -17,11 +37,12 @@ function load(native) {
       w.TextEncoder = TextEncoder; w.TextDecoder = TextDecoder; w.Uint8Array = Uint8Array;
       w.matchMedia = () => ({ matches: false }); w.Element.prototype.scrollIntoView = function () {}; w.addEventListener('unhandledrejection', e => console.log('   rejected:', String(e.reason && e.reason.stack || e.reason).slice(0, 300)));
       w.VV_CONFIG = { googleWebClientId: 'x.apps.googleusercontent.com' };
-      if (native) w.VVP = { native: true,
+      if (fbmock && !native) w.VVP = { native: false, Firebase: fbmock.F };
+      if (native) w.VVP = { native: true, Firebase: fbmock ? fbmock.F : undefined,
         SecureStorage: { get: async k => secure[k] || null, set: async (k, v) => { secure[k] = v; } },
         LocalNotifications: { getPending: async () => ({ notifications: [] }), cancel: async () => {}, schedule: async () => {}, checkPermissions: async () => ({ display: 'granted' }), requestPermissions: async () => ({ display: 'granted' }) },
         BiometricAuth: { checkBiometry: async () => ({ isAvailable: true, deviceIsSecure: true }), authenticate: async () => {} },
-        SocialLogin: { initialize: async () => {}, login: async () => ({}) } };
+        SocialLogin: { initialize: async () => {}, login: async () => ({ result: { profile: { email: w.__gmail || '' }, accessToken: { token: 't' } } }) } };
     }
   });
 }
@@ -58,7 +79,11 @@ function load(native) {
     w.eval("togglePw('pw','pwt')"); ok(w.document.getElementById('pw').type === 'password');
   });
   await t('forgot password: phone lock check, then a new password works and the old one does not', async () => {
-    w.document.getElementById('em').value = 'a@b.com'; await w.eval('forgot()');
+    w.__gmail = 'someone.else@gmail.com'; w.document.getElementById('em').value = 'a@b.com'; await w.eval('forgot()');
+    ok(/Email not verified/.test(w.document.getElementById('mod').innerHTML) && /someone\.else@gmail\.com/.test(w.document.getElementById('mod').innerHTML), 'wrong Google account is refused');
+    ok(!/Set a new password/.test(w.document.getElementById('mod').innerHTML), 'no password box without verification');
+    w.eval('closeM()'); w.document.getElementById('em').value = 'a@b.com'; w.eval("st.em='a@b.com'");
+    w.__gmail = 'a@b.com'; await w.eval('forgot()');
     ok(/Set a new password/.test(w.document.getElementById('mod').innerHTML), 'reset dialog shown');
     w.document.getElementById('np').value = 'short'; await w.eval('setNewPw()'); ok(/at least 8/.test(w.document.getElementById('mod').innerHTML), 'short password refused');
     w.document.getElementById('np').value = 'brandnewpass9'; await w.eval('setNewPw()');
@@ -99,6 +124,53 @@ function load(native) {
   });
   await t('About shows the owner, no prototype wording, and builds as an Android app', async () => {
     w.eval("st.tab='about';draw()"); const h = app(); ok(/allinoneaideveloper2026/.test(h) && /allinoneaideveloper2026@gmail\.com/.test(h), 'owner and email'); ok(!/prototype/i.test(h), 'no prototype text'); ok(/VeloDVault is an Android app/.test(h)); ok(!/\[/.test(h.replace(/<[^>]*>/g, '')), 'no placeholders left in About');
+  });
+
+  console.log('Email sign-in with Firebase (verified email, any device)');
+  const fbm = makeFirebase(), fdom = load(true, fbm), fw = fdom.window, fapp = () => fw.document.getElementById('app').innerHTML, $f = id => fw.document.getElementById(id);
+  const fill = (em, pw) => { $f('em').value = em; $f('pw').value = pw; };
+  await t('Firebase mode is on and says the email is verified', async () => { await wait(() => fw.FBAUTH && fw.FBAUTH.enabled && /verified before/.test(fapp())); });
+  await t('without Firebase the app clearly says it is in test mode', async () => {
+    const nf = load(true).window; await wait(() => nf.document.getElementById('app').innerHTML.length > 100);
+    ok(/Test mode: accounts exist only on this phone/.test(nf.document.getElementById('app').innerHTML)); ok(nf.eval('fbOn()') === false);
+  });
+  await t('sign-up needs consent, then shows a check-your-email screen and does NOT open the app', async () => {
+    fw.eval("st.mode='signup';draw()"); fill('Sam@Example.com', 'longpassword1'); await fw.eval('fbAuth()'); ok(/confirm the privacy notice/.test(fapp()), 'consent required'); ok(!fbm.db['sam@example.com'], 'no account without consent');
+    fill('Sam@Example.com', 'longpassword1'); $f('cn').checked = true; await fw.eval('fbAuth()');
+    ok(/Check your email/.test(fapp()) && /sam@example\.com/.test(fapp()), 'verify screen'); ok(!fw.eval('st.user'), 'app stays closed'); ok(fbm.sent.verify.includes('sam@example.com'), 'verification email sent');
+  });
+  await t('tapping "I have verified" before opening the link is refused', async () => { await fw.eval('fbCheck()'); ok(/Not verified yet/.test(fapp()) && !fw.eval('st.user')); });
+  await t('after the link is opened the account opens, with no password stored in the app', async () => {
+    fbm.verify('sam@example.com'); await fw.eval('fbCheck()'); await wait(() => fw.eval('st.user') === 'sam@example.com');
+    const u = fw.eval("S.get('vw_users')")['sam@example.com']; ok(u.fb === true && !u.h && !u.salt && !u.pw, 'no local password data');
+  });
+  await t('same email cannot be registered twice', async () => {
+    await fw.eval('signOut()'); ok(!fw.eval('st.user')); fw.eval("st.mode='signup';draw()"); fill('sam@example.com', 'otherpassword9'); $f('cn').checked = true; await fw.eval('fbAuth()');
+    ok(/already exists/.test(fapp()), 'duplicate refused');
+  });
+  await t('wrong password is refused; right password opens the app (like a second phone)', async () => {
+    fw.eval("st.mode='signin';draw()"); fill('sam@example.com', 'wrongpassword'); await fw.eval('fbAuth()'); ok(/Incorrect email or password/.test(fapp()) && !fw.eval('st.user'));
+    fill('sam@example.com', 'longpassword1'); await fw.eval('fbAuth()'); await wait(() => fw.eval('st.user') === 'sam@example.com');
+  });
+  await t('an unverified account cannot sign in until verified', async () => {
+    await fw.eval('signOut()'); fbm.db['new@example.com'] = { email: 'new@example.com', pw: 'abcdefgh1', verified: false, uid: 'u9' };
+    fw.eval("st.mode='signin';draw()"); fill('new@example.com', 'abcdefgh1'); await fw.eval('fbAuth()'); ok(/Check your email/.test(fapp()) && !fw.eval('st.user'), 'sent to verify screen');
+    await fw.eval('fbBack()'); ok(/Create account|Sign up/.test(fapp()));
+  });
+  await t('forgot password sends a reset email and never reveals whether the account exists', async () => {
+    fw.eval("st.mode='signin';draw()"); $f('em').value = 'sam@example.com'; await fw.eval('fbForgot()'); const a1 = fw.document.getElementById('mod').innerHTML;
+    fw.eval('closeM()'); $f('em').value = 'nobody@example.com'; await fw.eval('fbForgot()'); const a2 = fw.document.getElementById('mod').innerHTML;
+    ok(/If an account exists/.test(a1) && /If an account exists/.test(a2), 'same wording'); ok(fbm.sent.reset.includes('sam@example.com'), 'reset email requested'); ok(!/not found|no account/i.test(a2));
+  });
+  await t('signing out elsewhere signs this phone out too', async () => {
+    fill('sam@example.com', 'longpassword1'); await fw.eval('fbAuth()'); await wait(() => fw.eval('st.user') === 'sam@example.com');
+    fbm.remoteSignOut(); await wait(() => !fw.eval('st.user')); ok(/signed out|Sign in/i.test(fapp()));
+  });
+  await t('Security screen lists verified email sign-in as active', async () => { fill('sam@example.com', 'longpassword1'); await fw.eval('fbAuth()'); await wait(() => fw.eval('st.user')); fw.eval("st.tab='security';draw()"); ok(/Verified email sign-in[\s\S]*?Active/.test(fapp()) && /Firebase Authentication/.test(fapp())); });
+  await t('More offers to connect Google Drive for email accounts (restore on a new phone)', async () => { fw.eval("st.tab='more';draw()"); ok(/Connect Google Drive/.test(fapp())); });
+  await t('deleting the account needs the password, removes the sign-in account and wipes the phone', async () => {
+    fw.eval('askDelAcc()'); $f('dpw').value = 'wrong'; $f('dc').value = 'DELETE'; await fw.eval('delAcc()'); ok(/Incorrect email or password/.test(fw.document.getElementById('mod').innerHTML) && fbm.db['sam@example.com'], 'wrong password refused');
+    $f('dpw').value = 'longpassword1'; await fw.eval('delAcc()'); ok(!fbm.db['sam@example.com'] && fbm.deleted.includes('sam@example.com'), 'sign-in account deleted'); ok(!fw.eval('st.user') && !fw.eval("S.get('vw_users')")['sam@example.com'], 'phone wiped');
   });
 
   console.log('Web mode (browser)');

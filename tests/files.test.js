@@ -6,7 +6,7 @@ const appId = JSON.parse(fs.readFileSync(path.join(root, 'capacitor.config.json'
 const need = [
   'package.json', 'package-lock.json', 'capacitor.config.json', 'README.md',
   'src/plugins.js',
-  'www/index.html', 'www/native.js', 'www/vv-plugins.js', 'www/config.js', 'www/sw.js', 'www/manifest.webmanifest', 'www/_headers',
+  'www/index.html', 'www/native.js', 'www/vv-plugins.js', 'www/config.js', 'www/firebase-config.js', 'www/fbauth.js', 'www/sw.js', 'www/manifest.webmanifest', 'www/_headers',
   'www/privacy.html', 'www/terms.html', 'www/delete-account.html', 'www/grievance.html', 'www/security.html',
   'www/icons/icon-192.png', 'www/icons/icon-512.png', 'www/icons/maskable-512.png',
   'site-src/index.html', 'site-src/robots.txt', 'site-src/_headers', 'site-src/security.txt',

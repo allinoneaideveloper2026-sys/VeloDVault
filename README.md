@@ -11,6 +11,7 @@ Personalized vehicle tracker. One codebase: the web app (`www/`) and the Android
 | `site-src/` | Landing page and site headers; `scripts/build-site.js` builds the public website into `site/` |
 | `tests/` | Automated checks (`npm test`, `node tests/app.test.js`) |
 | `.github/workflows/` | Free cloud build of the Android app, and a one-time signing key maker |
+| `www/fbauth.js`, `www/firebase-config.js` | Sign-in with Firebase Authentication (email verification, password reset, any device) |
 | `docs/` | Setup guides, publish checklist, incident plan, Play data-safety answers |
 
 Start with `docs/ANDROID-BUILD.md`, then `docs/GOOGLE-SETUP.md`, then `docs/PUBLISH-CHECKLIST.md`.

@@ -18,7 +18,8 @@
     "@capacitor/android": "^8.6.0",
     "@capacitor/core": "^8.6.0",
     "@capacitor/local-notifications": "^8.3.1",
-    "@capgo/capacitor-social-login": "^8.7.6"
+    "@capgo/capacitor-social-login": "^8.7.6",
+    "firebase": "^13.2.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.6.0",

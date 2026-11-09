@@ -20,6 +20,7 @@ Items marked OWNER need you; the rest are in this package.
 ## Google Play
 - [ ] OWNER: Play Console account.
 - [ ] OWNER: follow ANDROID-BUILD.md (app id, private repo, signing key, build).
+- [ ] OWNER: follow FIREBASE-SETUP.md (sign-in with verified email). The app must not be published while firebase-config.js still has YOUR_ values.
 - [ ] OWNER: follow GOOGLE-SETUP.md (Drive API, consent screen, Web and Android clients; add Play's signing SHA-1).
 - [ ] Target API 36 is already set in the project; confirm in Play Console.
 - [ ] Test on a real phone: sign-in, Drive folder appears, reminder test, lock, restore on a second phone.

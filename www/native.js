@@ -135,9 +135,12 @@
   var GA = 'https://www.googleapis.com', TOKEN = null, TEXP = 0, ginit = false, syncT = null, busy = false;
   var FOLDERS = ['Vehicle', 'Insurance', 'PUC', 'PA Cover', 'Expense', 'Driving Licence', 'Custom', 'Documents', '_app'];
   function cfgOk() { var c = window.VV_CONFIG; return !!(c && c.googleWebClientId && c.googleWebClientId.indexOf('YOUR_') !== 0); }
-  async function loginG() {
+  async function initG() {
     if (!cfgOk()) throw new Error('SETUP');
     if (!ginit) { await SL.initialize({ google: { webClientId: window.VV_CONFIG.googleWebClientId } }); ginit = true; }
+  }
+  async function loginG() {
+    await initG();
     var r = await SL.login({ provider: 'google', options: { scopes: ['https://www.googleapis.com/auth/drive.file'] } });
     var res = r.result || {};
     TOKEN = res.accessToken && res.accessToken.token; TEXP = Date.now() + 50 * 60000;
@@ -145,6 +148,15 @@
     if (!email || !TOKEN) throw new Error('NOTOKEN');
     return email;
   }
+  // Proves the person controls the Google account with this email (used before a password reset). No Drive access is requested.
+  N.verifyEmail = async function (email) {
+    await initG();
+    var r = await SL.login({ provider: 'google', options: {} });
+    var got = ((r && r.result && r.result.profile && r.result.profile.email) || '').toLowerCase();
+    if (!got) throw new Error('NOTOKEN');
+    if (got !== String(email).toLowerCase()) { var e = new Error('MISMATCH'); e.got = got; throw e; }
+    return true;
+  };
   N.googleLogin = async function () { var e = await loginG(); S.set('vw_gmode_' + e, true); return e; };
   async function gfetch(path, opt) {
     opt = opt || {};
@@ -204,6 +216,12 @@
     return savedAt;
   }
   N._push = pushAll;
+  // For people who sign in with email: link a Google account just for Drive backup and restore.
+  N.connectDrive = async function () {
+    var u = typeof st !== 'undefined' && st.user; if (!u) return;
+    try { await loginG(); S.set('vw_gmode_' + u, true); say('Google Drive connected'); await N.afterLogin(u); redraw(); }
+    catch (e) { say(String(e.message) === 'SETUP' ? 'Google sign-in is not set up yet' : 'Could not connect Google Drive'); }
+  };
   N.syncNow = async function (silent) {
     var u = typeof st !== 'undefined' && st.user; if (!u || !S.get('vw_gmode_' + u) || busy) return;
     busy = true;
