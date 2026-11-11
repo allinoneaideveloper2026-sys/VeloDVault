@@ -73,6 +73,13 @@ function load(native, fbmock) {
     const items = w.eval('remItems(recs())'); ok(items.length === 1 && /Insurance: Car/.test(items[0].title));
   });
 
+  await t('when Google sign-in fails, the screen shows the real reason', async () => {
+    const SL = w.VVP.SocialLogin, orig = SL.login; SL.login = async () => { throw Object.assign(new Error('Developer console is not set up correctly'), { code: '10' }); };
+    w.eval("st.user=null;st.mode='signin';draw()"); await w.eval('googleGo()'); const toastText = [...w.document.querySelectorAll('.toast')].map(n => n.textContent).join(' ');
+    ok(/Developer console is not set up correctly/.test(toastText) && /10/.test(toastText), 'reason shown: ' + toastText);
+    SL.login = async () => ({ result: { profile: { email: 'a@b.com' } } }); w.document.querySelectorAll('.toast').forEach(n => n.remove()); await w.eval('googleGo()');
+    ok(/did not give Drive access/.test([...w.document.querySelectorAll('.toast')].map(n => n.textContent).join(' ')), 'missing token explained'); SL.login = orig;
+  });
   await t('password field has a show/hide button that works', async () => {
     w.eval("st.user=null;st.mode='signin';draw()"); const pw = w.document.getElementById('pw');
     ok(pw.type === 'password' && w.document.getElementById('pwt'), 'button present'); w.eval("togglePw('pw','pwt')"); ok(w.document.getElementById('pw').type === 'text'); ok(w.document.getElementById('pwt').textContent === 'Hide');
