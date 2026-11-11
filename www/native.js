@@ -220,7 +220,7 @@
   N.connectDrive = async function () {
     var u = typeof st !== 'undefined' && st.user; if (!u) return;
     try { await loginG(); S.set('vw_gmode_' + u, true); say('Google Drive connected'); await N.afterLogin(u); redraw(); }
-    catch (e) { say(String(e.message) === 'SETUP' ? 'Google sign-in is not set up yet' : 'Could not connect Google Drive'); }
+    catch (e) { say(typeof gErr === 'function' ? gErr(e) : 'Could not connect Google Drive'); }
   };
   N.syncNow = async function (silent) {
     var u = typeof st !== 'undefined' && st.user; if (!u || !S.get('vw_gmode_' + u) || busy) return;

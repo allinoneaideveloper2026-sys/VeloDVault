@@ -371,7 +371,8 @@ function gbtn(){const note='<p style="font-size:12px;text-align:center">By conti
 if(window.NATIVE)return '<button class="btn ghost" onclick="googleGo()">G&nbsp; Continue with Google (saves to your Drive)</button>'+note;
 if(TESTING)return '<button class="btn ghost" onclick="login(\'demo.user@gmail.com\',1)">G&nbsp; Continue with Google (demo)</button>'+note;
 return '<p style="font-size:13px;text-align:center">Google sign-in with Drive saving is available in the Android app.</p>'}
-async function googleGo(){try{const em=await NATIVE.googleLogin();const u=users();if(!u[em]){u[em]={consent:nowS(),google:true};S.set('vw_users',u)}login(em);NATIVE.afterLogin(em)}catch(e){const m=String(e&&e.message||e);toast(m=='SETUP'?'Google sign-in is not set up yet (see docs/GOOGLE-SETUP.md)':'Google sign-in did not complete')}}
+async function googleGo(){try{const em=await NATIVE.googleLogin();const u=users();if(!u[em]){u[em]={consent:nowS(),google:true};S.set('vw_users',u)}login(em);NATIVE.afterLogin(em)}catch(e){toast(gErr(e))}}
+function gErr(e){const m=String(e&&e.message||e),c=e&&e.code?e.code+' ':'';if(m=='SETUP')return 'Google sign-in is not set up yet (see docs/GOOGLE-SETUP.md)';if(m=='NOTOKEN')return 'Google did not give Drive access. Check the drive.file scope on the consent screen and that your Gmail is a test user.';return 'Google sign-in did not complete: '+(c+m).slice(0,160)}
 function nativeCards(){if(!window.NATIVE)return '';const rem=S.get('vw_rem')===true,bio=!!S.get('vw_bio'),g=st.user&&S.get('vw_gmode_'+st.user),ds=st.user&&S.get('vw_drvstat_'+st.user);
 const pill=(on,a,b)=>`<span class='pill ${on?'ok':'none'}'>${on?a:b}</span>`;
 return `<div class='card row' onclick='NATIVE.toggleRem()' style='cursor:pointer'><div class='ic'>🔔</div><div class='grow'><b>Reminders</b><p style='margin:0'>${rem?'30, 7 and 1 day before, and on the day':'Get a phone notification before things expire'}</p></div>${pill(rem,'On','Off')}</div>`
