@@ -180,6 +180,42 @@ function load(native, fbmock) {
     $f('dpw').value = 'longpassword1'; await fw.eval('delAcc()'); ok(!fbm.db['sam@example.com'] && fbm.deleted.includes('sam@example.com'), 'sign-in account deleted'); ok(!fw.eval('st.user') && !fw.eval("S.get('vw_users')")['sam@example.com'], 'phone wiped');
   });
 
+  console.log('Setup check (finds why sign-up or Google fails)');
+  const modalText = win => win.document.getElementById('mod').innerHTML;
+  await t('the sign-in screen offers the setup check, and it opens before anyone can sign in', async () => {
+    fw.eval("st.user=null;st.mode='signin';draw()"); ok(/run the setup check/i.test(fapp()), 'link on sign-in screen'); fw.eval('setupCheck()'); ok(/Setup check/.test(modalText(fw)) && /Firebase settings/.test(modalText(fw)) && /Google settings/.test(modalText(fw)) && /Version 1\.8/.test(modalText(fw)));
+  });
+  const probe = async (win, resp) => { win.fetch = typeof resp === 'function' ? resp : async () => ({ status: resp.status || 400, json: async () => resp.body }); win.eval('setupCheck()'); await win.eval('runChecks()'); return win.document.getElementById('sc').textContent; };
+  await t('Firebase live test: working setup', async () => { ok(/key is valid and Email\/Password sign-in is switched on/.test(await probe(fw, { body: { error: { message: 'INVALID_LOGIN_CREDENTIALS' } } })), 'ok case'); });
+  await t('Firebase live test: names each common mistake', async () => {
+    ok(/NOT switched on/.test(await probe(fw, { body: { error: { message: 'OPERATION_NOT_ALLOWED' } } })), 'email sign-in off');
+    ok(/key in this build is not valid/.test(await probe(fw, { body: { error: { message: 'API key not valid. Please pass a valid API key.' } } })), 'bad key');
+    ok(/Authentication is not started/.test(await probe(fw, { body: { error: { message: 'CONFIGURATION_NOT_FOUND' } } })), 'not started');
+    ok(/blocked or restricted/.test(await probe(fw, { status: 403, body: { error: { message: 'API_KEY_HTTP_REFERRER_BLOCKED' } } })), 'restricted key');
+    ok(/Could not reach Firebase/.test(await probe(fw, async () => { throw new Error('Failed to fetch'); })), 'no internet or blocked');
+  });
+  await t('without Firebase values the check says so instead of guessing', async () => { ok(/placeholders/.test(await probe(w, { body: {} }))); });
+  await t('Google test: shows success with Drive, or the exact reason', async () => {
+    w.eval("st.user=null;draw()"); w.fetch = async () => ({ ok: true, status: 200, json: async () => ({ files: [] }) }); w.eval('setupCheck()'); await w.eval('testGoogle()');
+    ok(/Signed in as a@b\.com/.test(w.document.getElementById('sc').textContent) && /Drive answered/.test(w.document.getElementById('sc').textContent), 'success path');
+    const SL = w.VVP.SocialLogin, orig = SL.login; SL.login = async () => { throw Object.assign(new Error('Developer console is not set up correctly'), { code: '10' }); };
+    w.eval('setupCheck()'); await w.eval('testGoogle()'); ok(/Developer console is not set up correctly/.test(w.document.getElementById('sc').textContent), 'failure reason'); SL.login = orig;
+  });
+  await t('Setup check shows the app\'s own package name and SHA-1 to copy into Google Cloud', async () => {
+    w.VVNative = { info: () => JSON.stringify({ pkg: 'com.allinoneaideveloper2026.velodvault', sha1: 'AA:BB:CC:DD', sha256: '11:22:33' }) };
+    w.eval('setupCheck()'); const txt = w.document.getElementById('sc').textContent;
+    ok(/Package name: com\.allinoneaideveloper2026\.velodvault/.test(txt) && /SHA-1: AA:BB:CC:DD/.test(txt) && /exactly this package name/.test(txt), txt.slice(0, 300));
+    w.VVNative = { info: () => JSON.stringify({ error: 'SecurityException' }) }; w.eval('setupCheck()'); ok(/Could not read the app identity/.test(w.document.getElementById('sc').textContent), 'error case');
+    w.VVNative = { info: () => JSON.stringify({ pkg: 'com.allinoneaideveloper2026.velodvault', sha1: 'AA:BB:CC:DD', sha256: '11:22:33' }) };
+  });
+  await t('copy report works without clipboard and includes version and recent errors', async () => {
+    w.eval('setupCheck()'); w.eval('copyReport()'); const m = modalText(w); ok(/VeloDVault setup report/.test(m) && /Version 1\.8/.test(m) && /google sign-in/i.test(m) && /Developer console/.test(m) && /SHA-1: AA:BB:CC:DD/.test(m), 'report content');
+    ok(!/AIza|client_secret/.test(m), 'no secrets in the report');
+  });
+  await t('sign-up errors show the real code instead of a vague message', async () => {
+    ok(/Email\/Password/.test(fw.FBAUTH.friendly({ code: 'auth/operation-not-allowed' })), 'known code explained'); ok(/auth\/some-new-thing/.test(fw.FBAUTH.friendly({ code: 'auth/some-new-thing' })), 'unknown code shown');
+  });
+
   console.log('Web mode (browser)');
   const d2 = load(false), w2 = d2.window;
   await t('web build has no fake Google login and no testing tools', async () => {

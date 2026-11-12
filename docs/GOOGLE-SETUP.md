@@ -8,7 +8,7 @@ Check on the consent screen page that Google shows this scope with its sensitivi
 3. APIs and services > OAuth consent screen: User type External; app name VeloDVault; support email; logo (icons/icon-512.png); privacy policy link (your privacy.html address); authorised domain; add scope `.../auth/drive.file`; add your own and testers' Gmail addresses under Test users.
 4. Credentials > Create credentials > OAuth client ID:
    a. **Web application** (any name). Copy its client ID into `www/config.js` (`googleWebClientId`). This is the ID the app passes to Google.
-   b. **Android**: package name `com.allinoneaideveloper2026.velodvault`; SHA-1 = your signing key's fingerprint. To read it without any tools: run **Build Android app**, open that run's **Summary** page, and look for **Signing fingerprints** (it lists SHA1 and SHA256; these are public values). Create one Android client per key you use:
+   b. **Android**: the easiest way to get both values exactly right is the app itself. Install the build, open the sign-in screen, tap **Having trouble? Run the setup check**, and read **This app (for Google setup)**: it shows the **Package name** and **SHA-1** this installed app really has. Use those two values for the Android client. (The build run's Summary also lists the fingerprint if the workflow step is present.) Create one Android client per key you use:
       - your upload key (for the APK you install directly): the SHA1 from the run summary
       - Play's app signing key (for builds installed from Google Play): Play Console > Setup > App signing
 5. Put the Web client ID into `www/config.js`, commit, and run **Build Android app** again. Install the new APK. Then in More you will see Google Drive status after signing in with Google.
