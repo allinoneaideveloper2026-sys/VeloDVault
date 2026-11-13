@@ -28,6 +28,8 @@ Items marked OWNER need you; the rest are in this package.
 - [ ] Content rating, 18+ audience, no ads.
 - [ ] Closed test: 12 testers for 14 days for new personal accounts.
 
+- [ ] Set DIAG=false in www/index.html (hides the Setup check from ordinary users) before the public release.
+
 ## Security
 - [ ] Turn on two-step verification for GitHub, Cloudflare, Google and the support mailbox.
 - [ ] Keep incident-response-plan.md where you can find it.

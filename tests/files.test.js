@@ -11,7 +11,7 @@ const need = [
   'www/icons/icon-192.png', 'www/icons/icon-512.png', 'www/icons/maskable-512.png',
   'site-src/index.html', 'site-src/robots.txt', 'site-src/_headers', 'site-src/security.txt',
   'scripts/build-site.js', 'scripts/set-app-id.py',
-  'tests/native.test.js', 'tests/site.test.js', 'tests/app.test.js',
+  'tests/native.test.js', 'tests/versions.test.js', 'tests/site.test.js', 'tests/app.test.js',
   'android/gradlew', 'android/build.gradle', 'android/settings.gradle', 'android/variables.gradle', 'android/gradle/wrapper/gradle-wrapper.jar', 'android/gradle/wrapper/gradle-wrapper.properties',
   'android/app/build.gradle', 'android/app/src/main/AndroidManifest.xml',
   'android/app/src/main/java/' + appId.split('.').join('/') + '/MainActivity.java',

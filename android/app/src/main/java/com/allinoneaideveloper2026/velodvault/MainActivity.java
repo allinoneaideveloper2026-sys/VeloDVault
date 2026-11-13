@@ -1,5 +1,7 @@
 package com.allinoneaideveloper2026.velodvault;
 
+// VV-VERSION 1.9
+
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;

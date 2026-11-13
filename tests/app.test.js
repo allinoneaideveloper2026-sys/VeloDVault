@@ -1,3 +1,4 @@
+// VV-VERSION 1.9
 // Loads the real index.html in a simulated browser, in Android-app mode and in web mode. Run: node tests/app.test.js
 const { JSDOM, VirtualConsole } = require('jsdom'); const fs = require('fs'); const path = require('path'); const { webcrypto } = require('crypto');
 const W = f => fs.readFileSync(path.join(__dirname, '../www', f), 'utf8');
@@ -27,7 +28,7 @@ function makeFirebase() {
   return { F, db, sent, deleted, verify: e => { db[e].verified = true; }, remoteSignOut: () => { cur = null; notify(); } };
 }
 function load(native, fbmock) {
-  const html = W('index.html').replace('<script src="vv-plugins.js"></script>', '').replace('<script src="firebase-config.js"></script>', fbmock ? '<script>window.VV_FIREBASE={apiKey:"k",authDomain:"x.firebaseapp.com",projectId:"p",appId:"a"}</script>' : '<script>' + W('firebase-config.js') + '</script>').replace('<script src="fbauth.js"></script>', '<script>' + W('fbauth.js') + '</script>').replace('<script src="config.js"></script>', '').replace('<script src="native.js"></script>', native ? '<script>' + W('native.js') + '</script>' : '');
+  const html = W('index.html').replace('<script src="vv-plugins.js"></script>', '').replace('<script src="firebase-config.js"></script>', fbmock ? '<script>window.VV_FIREBASE={apiKey:"k",authDomain:"x.firebaseapp.com",projectId:"p",appId:"a"}</script>' : '<script>window.VV_FIREBASE={apiKey:"YOUR_FIREBASE_API_KEY",authDomain:"YOUR_PROJECT_ID.firebaseapp.com",projectId:"YOUR_PROJECT_ID",appId:"YOUR_FIREBASE_APP_ID"}</script>').replace('<script src="fbauth.js"></script>', '<script>' + W('fbauth.js') + '</script>').replace('<script src="config.js"></script>', '').replace('<script src="native.js"></script>', native ? '<script>' + W('native.js') + '</script>' : '');
   const secure = {};
   const vc = new VirtualConsole(); vc.on('jsdomError', e => { if (!/scrollTo/.test(e.message)) console.log('   page error:', e.message.slice(0, 220)); });
   return new JSDOM(html, {
@@ -183,7 +184,7 @@ function load(native, fbmock) {
   console.log('Setup check (finds why sign-up or Google fails)');
   const modalText = win => win.document.getElementById('mod').innerHTML;
   await t('the sign-in screen offers the setup check, and it opens before anyone can sign in', async () => {
-    fw.eval("st.user=null;st.mode='signin';draw()"); ok(/run the setup check/i.test(fapp()), 'link on sign-in screen'); fw.eval('setupCheck()'); ok(/Setup check/.test(modalText(fw)) && /Firebase settings/.test(modalText(fw)) && /Google settings/.test(modalText(fw)) && /Version 1\.8/.test(modalText(fw)));
+    fw.eval("st.user=null;st.mode='signin';draw()"); ok(/run the setup check/i.test(fapp()), 'link on sign-in screen'); fw.eval('setupCheck()'); ok(/Setup check/.test(modalText(fw)) && /Firebase settings/.test(modalText(fw)) && /Google settings/.test(modalText(fw)) && new RegExp('Version ' + fw.eval('APPVER').replace('.', '\\.')).test(modalText(fw)));
   });
   const probe = async (win, resp) => { win.fetch = typeof resp === 'function' ? resp : async () => ({ status: resp.status || 400, json: async () => resp.body }); win.eval('setupCheck()'); await win.eval('runChecks()'); return win.document.getElementById('sc').textContent; };
   await t('Firebase live test: working setup', async () => { ok(/key is valid and Email\/Password sign-in is switched on/.test(await probe(fw, { body: { error: { message: 'INVALID_LOGIN_CREDENTIALS' } } })), 'ok case'); });
@@ -209,7 +210,7 @@ function load(native, fbmock) {
     w.VVNative = { info: () => JSON.stringify({ pkg: 'com.allinoneaideveloper2026.velodvault', sha1: 'AA:BB:CC:DD', sha256: '11:22:33' }) };
   });
   await t('copy report works without clipboard and includes version and recent errors', async () => {
-    w.eval('setupCheck()'); w.eval('copyReport()'); const m = modalText(w); ok(/VeloDVault setup report/.test(m) && /Version 1\.8/.test(m) && /google sign-in/i.test(m) && /Developer console/.test(m) && /SHA-1: AA:BB:CC:DD/.test(m), 'report content');
+    w.eval('setupCheck()'); w.eval('copyReport()'); const m = modalText(w); ok(/VeloDVault setup report/.test(m) && new RegExp('Version ' + w.eval('APPVER').replace('.', '\\.')).test(m) && /google sign-in/i.test(m) && /Developer console/.test(m) && /SHA-1: AA:BB:CC:DD/.test(m), 'report content');
     ok(!/AIza|client_secret/.test(m), 'no secrets in the report');
   });
   await t('sign-up errors show the real code instead of a vague message', async () => {

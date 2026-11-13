@@ -1,3 +1,4 @@
+// VV-VERSION 1.9
 // Bundles the Capacitor plugins into one file the single-page app can use without a build system.
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';

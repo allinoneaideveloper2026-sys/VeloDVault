@@ -400,7 +400,7 @@ async function fbForgot(){const em=$('em').value.trim().toLowerCase();st.em=em;i
 try{await FBAUTH.reset(em)}catch(e){if(!e||e.code!=='auth/user-not-found'){toast(FBAUTH.friendly(e));return}}
 modal('Check your email',`<p style='white-space:normal'>If an account exists for <b>${clean(em)}</b>, we have sent a link to reset the password. Open it from any device, then sign in with the new password.</p><p style='white-space:normal;font-size:12px'>Not there? Check spam.</p>`,[{l:'OK',a:'closeM()'}])}
 async function signOut(){if(fbOn()&&users()[st.user]&&users()[st.user].fb){try{await FBAUTH.signOut()}catch(e){}}st.user=null;S.set('vw_session',null);draw()}
-const DIAG=true,APPVER='1.8',DLOG=[];
+const DIAG=true,APPVER='1.9',DLOG=[];
 function dlog(w,e){DLOG.unshift({t:nowS(),w,c:(e&&e.code)||'',m:String(e&&e.message||e).slice(0,200)});if(DLOG.length>20)DLOG.length=20}
 const mask=x=>{x=String(x||'');return x.length>12?x.slice(0,6)+'…'+x.slice(-4):x};
 const SCI={ok:'✅',bad:'❌',warn:'⚠️'};let SCR=[];

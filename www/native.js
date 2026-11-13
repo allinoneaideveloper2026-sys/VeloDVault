@@ -1,3 +1,4 @@
+/* VV-VERSION 1.9 */
 /* VeloDVault native features. Active only inside the Android app; on the web it does nothing. */
 (function () {
   var P = window.VVP;
@@ -220,8 +221,9 @@
   N.connectDrive = async function () {
     var u = typeof st !== 'undefined' && st.user; if (!u) return;
     try { await loginG(); S.set('vw_gmode_' + u, true); say('Google Drive connected'); await N.afterLogin(u); redraw(); }
-    catch (e) { say(typeof gErr === 'function' ? gErr(e) : 'Could not connect Google Drive'); }
+    catch (e) { if (typeof dlog === 'function') dlog('connect drive', e); say(typeof gErr === 'function' ? gErr(e) : 'Could not connect Google Drive'); }
   };
+  N.probeDrive = async function () { await gfetch('/drive/v3/files?pageSize=1&fields=files(id)'); return true; };
   N.syncNow = async function (silent) {
     var u = typeof st !== 'undefined' && st.user; if (!u || !S.get('vw_gmode_' + u) || busy) return;
     busy = true;
@@ -230,7 +232,7 @@
       var at = await pushAll(u, driveData());
       setStat(u, true, 'Saved to Drive'); if (!silent) say('Saved to your Drive'); return at;
     } catch (e) {
-      var m = String(e.message);
+      var m = String(e.message); if (typeof dlog === 'function') dlog('drive sync', e);
       setStat(u, false, m === 'AUTH' ? 'Tap Sync now to sign in again' : m === 'SETUP' ? 'Google sign-in is not set up yet' : 'Could not reach Drive');
     } finally { busy = false; }
   };

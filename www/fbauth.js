@@ -1,3 +1,4 @@
+/* VV-VERSION 1.9 */
 /* VeloDVault sign-in with Firebase Authentication (email verification, password reset, sign-in on any device).
    Firebase holds only the email, the password hash and an account id. Records stay on the phone and in the user's own Drive. */
 (function () {
@@ -17,9 +18,16 @@
       'auth/too-many-requests': 'Too many tries. Wait a few minutes and try again.',
       'auth/network-request-failed': 'No internet. Check your connection and try again.',
       'auth/requires-recent-login': 'For safety, sign in again and retry.',
-      'auth/user-disabled': 'This account has been disabled. Contact support.'
+      'auth/user-disabled': 'This account has been disabled. Contact support.',
+      'auth/operation-not-allowed': 'Email sign-up is not switched on in Firebase yet (Authentication > Sign-in method > Email/Password).',
+      'auth/configuration-not-found': 'Firebase Authentication is not started for this project (open Authentication in Firebase and click Get started).',
+      'auth/invalid-api-key': 'The Firebase key in this build is wrong. Copy it again from Firebase project settings.',
+      'auth/api-key-not-valid.-please-pass-a-valid-api-key.': 'The Firebase key in this build is wrong. Copy it again from Firebase project settings.',
+      'auth/unauthorized-domain': 'This address is not allowed in Firebase (Authentication > Settings > Authorized domains).',
+      'auth/app-not-authorized': 'This app is not allowed to use that Firebase key. Check the key restrictions.',
+      'auth/internal-error': 'Firebase had an internal problem. Try again, and run the Setup check.'
     };
-    return m[c] || 'Something went wrong. Please try again.';
+    return m[c] || ('Something went wrong' + (c ? ' (' + c + ')' : '') + '. Try again, and run the Setup check.');
   };
   if (!ready) return;
   var app = F.initializeApp(cfg);
