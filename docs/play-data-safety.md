@@ -20,7 +20,10 @@ Answers must match the final build. Update when Google sign-in, analytics or not
 | Privacy policy URL | https://[YOUR-DOMAIN]/privacy.html | |
 
 ## Permissions the app requests
-INTERNET, CAMERA (only when the user taps Take photo to capture a document; photos are not sent to us), POST_NOTIFICATIONS (local reminders), USE_BIOMETRIC (app lock), RECEIVE_BOOT_COMPLETED (restore reminders after restart). No location, contacts or microphone permission.
+INTERNET, POST_NOTIFICATIONS (local reminders), USE_BIOMETRIC (app lock), RECEIVE_BOOT_COMPLETED (restore reminders after restart). No location, contacts or microphone permission.
 
 ## Other answers
 Backups: app data excluded from cloud and device backups. Encryption at rest: yes (Android Keystore). Screenshots blocked in release builds.
+
+## Camera
+The app declares no CAMERA permission. Take photo opens the phone's own camera app through the system; the photo is kept inside VeloDVault (encrypted on the phone and, for Drive users, in the user's own Drive) and is not saved to the gallery. Photos are not sent to us.

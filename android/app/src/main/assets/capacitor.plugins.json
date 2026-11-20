@@ -8,6 +8,10 @@
 		"classpath": "com.aparajita.capacitor.securestorage.SecureStorage"
 	},
 	{
+		"pkg": "@capacitor/camera",
+		"classpath": "com.capacitorjs.plugins.camera.CameraPlugin"
+	},
+	{
 		"pkg": "@capacitor/local-notifications",
 		"classpath": "com.capacitorjs.plugins.localnotifications.LocalNotificationsPlugin"
 	},

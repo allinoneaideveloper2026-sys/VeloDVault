@@ -18,5 +18,7 @@ The report holds no passwords or secrets (the Firebase key is shortened).
 | Google did not give Drive access | The drive.file scope is missing, or your Gmail is not a test user | Google Auth Platform > Data Access (add scope) and Audience (add test user) |
 | Drive refused | Google Drive API is not enabled in the same project | APIs & Services > Library > Google Drive API > Enable |
 
+| Take photo opens the gallery, not the camera | An old build that used the web file picker | Install the build from version 1.10 or later: it uses the phone's camera directly |
+
 Rebuild and reinstall after any change to a config file.
-Before the public release set `DIAG=false` in `www/index.html` so ordinary users do not see the setup check.
+The same table is printed in the GitHub **run summary** after every build (section "Setup check"), so you can check Firebase and Google settings before installing the app. The in-app Setup check is hidden: tap the version text in More > About (or the small footer text on the sign-in screen) 7 times to show it. Keep `DIAG=false` in `www/index.html` for the public release.

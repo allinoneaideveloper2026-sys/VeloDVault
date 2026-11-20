@@ -1,3 +1,4 @@
+/* VV-VERSION 1.10 */
 /* VeloDVault native features. Active only inside the Android app; on the web it does nothing. */
 (function () {
   var P = window.VVP;
@@ -27,7 +28,7 @@
     var ks = Object.keys(dirty); dirty = {};
     for (var i = 0; i < ks.length; i++) {
       var k = ks[i];
-      if (k in mem) localStorage.setItem('enc_' + k, await enc(JSON.stringify(mem[k])));
+      if (k in mem) { try { localStorage.setItem('enc_' + k, await enc(JSON.stringify(mem[k]))); } catch (e) { N.storageFull = true; say('Storage is full. Delete old documents or sync to Drive.'); } }
     }
   }
   window.SEC = {
@@ -77,6 +78,14 @@
   }
   function lock() { if (typeof S === 'undefined' || !S.get('vw_bio')) return; overlay().style.display = 'flex'; locked = true; unlock(); }
   N.bootLock = lock;
+  // Opens the real camera (not the gallery). Photos are NOT saved to the phone's gallery.
+  N.takePhoto = async function () {
+    var C = P.Camera; if (!C) throw new Error('NOCAMERA');
+    var r = await C.Camera.getPhoto({ quality: 85, width: 1600, correctOrientation: true, saveToGallery: false, resultType: C.CameraResultType.Base64, source: C.CameraSource.Camera });
+    if (!r || !r.base64String) throw new Error('NOPHOTO');
+    return { b64: r.base64String, format: r.format || 'jpeg' };
+  };
+  N.verifyOwner = function () { return BA.authenticate({ reason: 'Confirm it is you to reset your password', allowDeviceCredential: true, androidTitle: 'Reset password', androidSubtitle: 'Confirm it is you' }); };
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { hiddenAt = Date.now(); if (window.SEC && SEC.on) SEC.flushNow(); }
     else if (typeof S !== 'undefined' && S.get('vw_bio') && !locked && Date.now() - hiddenAt > 30000) lock();
@@ -134,9 +143,12 @@
   var GA = 'https://www.googleapis.com', TOKEN = null, TEXP = 0, ginit = false, syncT = null, busy = false;
   var FOLDERS = ['Vehicle', 'Insurance', 'PUC', 'PA Cover', 'Expense', 'Driving Licence', 'Custom', 'Documents', '_app'];
   function cfgOk() { var c = window.VV_CONFIG; return !!(c && c.googleWebClientId && c.googleWebClientId.indexOf('YOUR_') !== 0); }
-  async function loginG() {
+  async function initG() {
     if (!cfgOk()) throw new Error('SETUP');
     if (!ginit) { await SL.initialize({ google: { webClientId: window.VV_CONFIG.googleWebClientId } }); ginit = true; }
+  }
+  async function loginG() {
+    await initG();
     var r = await SL.login({ provider: 'google', options: { scopes: ['https://www.googleapis.com/auth/drive.file'] } });
     var res = r.result || {};
     TOKEN = res.accessToken && res.accessToken.token; TEXP = Date.now() + 50 * 60000;
@@ -144,6 +156,15 @@
     if (!email || !TOKEN) throw new Error('NOTOKEN');
     return email;
   }
+  // Proves the person controls the Google account with this email (used before a password reset). No Drive access is requested.
+  N.verifyEmail = async function (email) {
+    await initG();
+    var r = await SL.login({ provider: 'google', options: {} });
+    var got = ((r && r.result && r.result.profile && r.result.profile.email) || '').toLowerCase();
+    if (!got) throw new Error('NOTOKEN');
+    if (got !== String(email).toLowerCase()) { var e = new Error('MISMATCH'); e.got = got; throw e; }
+    return true;
+  };
   N.googleLogin = async function () { var e = await loginG(); S.set('vw_gmode_' + e, true); return e; };
   async function gfetch(path, opt) {
     opt = opt || {};
@@ -178,28 +199,59 @@
     ids.root = ids.root || await mk('VeloDVault', null); ids.f = ids.f || {};
     for (var i = 0; i < FOLDERS.length; i++) ids.f[FOLDERS[i]] = ids.f[FOLDERS[i]] || await mk(FOLDERS[i], ids.root);
   }
+  // One folder per vehicle under Documents, files named Nickname_Type_Date. A new upload of the same type for the same vehicle replaces the old file.
+  async function pushPlan(ids, plan, recs) {
+    if (!plan) return;
+    ids.pf = ids.pf || {}; ids.pfn = ids.pfn || {}; ids.slots = ids.slots || {}; ids.sigs = ids.sigs || {}; ids.vsheet = ids.vsheet || {};
+    var byId = {}; recs.forEach(function (r) { byId[r.id] = r; });
+    for (var gi = 0; gi < plan.groups.length; gi++) {
+      var G = plan.groups[gi]; if (!G.docs.length && !(G.csv && G.key.indexOf('veh:') === 0)) continue;
+      var fid = ids.pf[G.key];
+      if (fid && ids.pfn[G.key] !== G.folder) {
+        try { await gfetch('/drive/v3/files/' + fid + '?fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: G.folder }) }); }
+        catch (e) { if (String(e.message) === 'HTTP 404') fid = null; else throw e; }
+      }
+      if (!fid) fid = await mk(G.folder, ids.f.Documents);
+      ids.pf[G.key] = fid; ids.pfn[G.key] = G.folder;
+      for (var di = 0; di < G.docs.length; di++) {
+        var d = G.docs[di], ex = ids.slots[d.slot], sig = d.sig + '|' + d.fileName, id = ex;
+        if (!(ex && ids.sigs[d.slot] === sig)) {
+          try { id = await upl(d.fileName, fid, d.mime, d.b64, ex || null, null, true); }
+          catch (e) { if (ex && String(e.message) === 'HTTP 404') id = await upl(d.fileName, fid, d.mime, d.b64, null, null, true); else throw e; }
+          ids.slots[d.slot] = id; ids.sigs[d.slot] = sig;
+        }
+        if (byId[d.rec] && byId[d.rec].docs && byId[d.rec].docs[d.idx]) byId[d.rec].docs[d.idx].driveId = id;
+      }
+      if (G.csv && G.key.indexOf('veh:') === 0) ids.vsheet[G.key] = await upl('Summary - ' + G.nick, fid, 'text/csv', G.csv, ids.vsheet[G.key], 'application/vnd.google-apps.spreadsheet');
+    }
+    (plan.clear || []).forEach(function (c) { var r = byId[c.rec]; if (r && r.docs && r.docs[c.idx]) delete r.docs[c.idx].driveId; });
+  }
   async function pushAll(user, data) {
     var key = 'vw_drvids_' + user, ids = S.get(key) || {};
     try { await ensureTree(ids); } catch (e) { if (String(e.message) === 'HTTP 404') { ids = {}; await ensureTree(ids); } else throw e; }
     var recs = data.records || [], i, j;
-    for (i = 0; i < recs.length; i++) {
-      var ds = recs[i].docs || [];
-      for (j = 0; j < ds.length; j++) {
-        var m = ds[j].data && !ds[j].driveId ? /^data:([^;]+);base64,(.*)$/.exec(ds[j].data) : null;
-        if (m) ds[j].driveId = await upl(ds[j].name, ids.f.Documents, m[1], m[2], null, null, true);
-      }
-    }
+    await pushPlan(ids, data.plan, recs);
     S.set('vw_r_' + user, recs);
     var savedAt = new Date().toISOString();
     var clean = recs.map(function (r) { return Object.assign({}, r, { docs: (r.docs || []).map(function (d) { return { name: d.name, type: d.type, driveId: d.driveId }; }) }); });
     ids.state = await upl('state.json', ids.f._app, 'application/json', JSON.stringify({ app: 'VeloDVault', v: 1, savedAt: savedAt, records: clean, bin: data.bin || [] }), ids.state);
     ids.sheets = ids.sheets || {};
     var names = Object.keys(data.sheets || {});
-    for (i = 0; i < names.length; i++) ids.sheets[names[i]] = await upl(names[i], ids.f[names[i]], 'text/csv', data.sheets[names[i]], ids.sheets[names[i]], 'application/vnd.google-apps.spreadsheet');
+    for (i = 0; i < names.length; i++) {
+      var parts = names[i].split('|'), title = parts[1] ? parts[0] + ' - ' + parts[1] : parts[0];
+      ids.sheets[names[i]] = await upl(title, ids.f[parts[0]], 'text/csv', data.sheets[names[i]], ids.sheets[names[i]], 'application/vnd.google-apps.spreadsheet');
+    }
     S.set(key, ids); S.set('vw_lastsync_' + user, savedAt);
     return savedAt;
   }
   N._push = pushAll;
+  // For people who sign in with email: link a Google account just for Drive backup and restore.
+  N.connectDrive = async function () {
+    var u = typeof st !== 'undefined' && st.user; if (!u) return;
+    try { await loginG(); S.set('vw_gmode_' + u, true); say('Google Drive connected'); await N.afterLogin(u); redraw(); }
+    catch (e) { if (typeof dlog === 'function') dlog('connect drive', e); say(typeof gErr === 'function' ? gErr(e) : 'Could not connect Google Drive'); }
+  };
+  N.probeDrive = async function () { await gfetch('/drive/v3/files?pageSize=1&fields=files(id)'); return true; };
   N.syncNow = async function (silent) {
     var u = typeof st !== 'undefined' && st.user; if (!u || !S.get('vw_gmode_' + u) || busy) return;
     busy = true;
@@ -208,7 +260,7 @@
       var at = await pushAll(u, driveData());
       setStat(u, true, 'Saved to Drive'); if (!silent) say('Saved to your Drive'); return at;
     } catch (e) {
-      var m = String(e.message);
+      var m = String(e.message); if (typeof dlog === 'function') dlog('drive sync', e);
       setStat(u, false, m === 'AUTH' ? 'Tap Sync now to sign in again' : m === 'SETUP' ? 'Google sign-in is not set up yet' : 'Could not reach Drive');
     } finally { busy = false; }
   };

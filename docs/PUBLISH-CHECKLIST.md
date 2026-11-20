@@ -28,7 +28,8 @@ Items marked OWNER need you; the rest are in this package.
 - [ ] Content rating, 18+ audience, no ads.
 - [ ] Closed test: 12 testers for 14 days for new personal accounts.
 
-- [ ] Set DIAG=false in www/index.html (hides the Setup check from ordinary users) before the public release.
+- [ ] Developer tools are hidden by default (DIAG=false). Testers can switch them on by tapping the version text in About, or the footer text on the sign-in screen, 7 times. Leave DIAG=false for release.
+- [ ] After each Build Android app run, open the run Summary and read the Setup check table and the Signing fingerprints.
 
 ## Security
 - [ ] Turn on two-step verification for GitHub, Cloudflare, Google and the support mailbox.

@@ -14,5 +14,10 @@ Check on the consent screen page that Google shows this scope with its sensitivi
 5. Put the Web client ID into `www/config.js`, commit, and run **Build Android app** again. Install the new APK. Then in More you will see Google Drive status after signing in with Google.
 6. While the consent screen is in Testing, only listed test users can sign in. Publish it to production before the public release.
 
-What gets saved: a folder VeloDVault in the user's Drive with one subfolder per category (each holding a Google Sheet), a Documents folder for uploaded files, and a small hidden-style _app folder with state.json used to restore on a new phone.
+What gets saved, all inside the user's own Drive (no other database or server):
+- `VeloDVault/` with one subfolder per category (Vehicle, Insurance, PUC, ...), each holding a Google Sheet; custom categories get their own sheet named `Custom - <category>`.
+- `VeloDVault/Documents/<Nickname> <Registration>/` : one folder per vehicle. It holds that vehicle's photos and PDFs named `Nickname_Type_Date.jpg` (for example `Fascino_PUC_2026-11-10.pdf`; Type is RC, Insurance, PUC, PA or Receipt-Service) and a Google Sheet `Summary - <Nickname>` listing its RC, insurance, PUC, PA and expenses with the matching file names.
+- A new upload of the same type for the same vehicle replaces the old file (only the latest of each type is kept in Drive). Several pages of one document get `_2`, `_3`.
+- `Documents/Personal/` holds the driving licence (`Name_DL_Date`); `Documents/Other/` holds documents of custom records.
+- `VeloDVault/_app/state.json` is a small file used to restore everything on a new phone.
 The sign-in and Drive code is tested against simulated services only. Test it on a real phone with a test user before any release.

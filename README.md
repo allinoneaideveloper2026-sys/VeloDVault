@@ -14,6 +14,8 @@ Personalized vehicle tracker. One codebase: the web app (`www/`) and the Android
 | `www/fbauth.js`, `www/firebase-config.js` | Sign-in with Firebase Authentication (email verification, password reset, any device) |
 | `docs/` | Setup guides, publish checklist, incident plan, Play data-safety answers |
 
+Every build prints a Setup check table (Firebase, Google, package name, release flags) in the GitHub run summary.
+
 Start with `docs/ANDROID-BUILD.md`, then `docs/GOOGLE-SETUP.md`, then `docs/PUBLISH-CHECKLIST.md`.
 
 Website (free): Cloudflare Pages, connect this private repo, build command `node scripts/build-site.js`, output folder `site`. This publishes the landing page and policy pages only. The web version of the app (the same `www` code) stays unpublished until you add `--with-app` to the build command.
