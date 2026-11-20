@@ -1,4 +1,4 @@
-// VV-VERSION 1.9
+// VV-VERSION 1.10
 // Confirms the repository holds files from one release. A web upload can leave some files from an older update.
 const fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..');

@@ -1,4 +1,4 @@
-/* VV-VERSION 1.9 */
+/* VV-VERSION 1.10 */
 /* VeloDVault native features. Active only inside the Android app; on the web it does nothing. */
 (function () {
   var P = window.VVP;
@@ -78,6 +78,13 @@
   }
   function lock() { if (typeof S === 'undefined' || !S.get('vw_bio')) return; overlay().style.display = 'flex'; locked = true; unlock(); }
   N.bootLock = lock;
+  // Opens the real camera (not the gallery). Photos are NOT saved to the phone's gallery.
+  N.takePhoto = async function () {
+    var C = P.Camera; if (!C) throw new Error('NOCAMERA');
+    var r = await C.Camera.getPhoto({ quality: 85, width: 1600, correctOrientation: true, saveToGallery: false, resultType: C.CameraResultType.Base64, source: C.CameraSource.Camera });
+    if (!r || !r.base64String) throw new Error('NOPHOTO');
+    return { b64: r.base64String, format: r.format || 'jpeg' };
+  };
   N.verifyOwner = function () { return BA.authenticate({ reason: 'Confirm it is you to reset your password', allowDeviceCredential: true, androidTitle: 'Reset password', androidSubtitle: 'Confirm it is you' }); };
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { hiddenAt = Date.now(); if (window.SEC && SEC.on) SEC.flushNow(); }
@@ -192,17 +199,38 @@
     ids.root = ids.root || await mk('VeloDVault', null); ids.f = ids.f || {};
     for (var i = 0; i < FOLDERS.length; i++) ids.f[FOLDERS[i]] = ids.f[FOLDERS[i]] || await mk(FOLDERS[i], ids.root);
   }
+  // One folder per vehicle under Documents, files named Nickname_Type_Date. A new upload of the same type for the same vehicle replaces the old file.
+  async function pushPlan(ids, plan, recs) {
+    if (!plan) return;
+    ids.pf = ids.pf || {}; ids.pfn = ids.pfn || {}; ids.slots = ids.slots || {}; ids.sigs = ids.sigs || {}; ids.vsheet = ids.vsheet || {};
+    var byId = {}; recs.forEach(function (r) { byId[r.id] = r; });
+    for (var gi = 0; gi < plan.groups.length; gi++) {
+      var G = plan.groups[gi]; if (!G.docs.length && !(G.csv && G.key.indexOf('veh:') === 0)) continue;
+      var fid = ids.pf[G.key];
+      if (fid && ids.pfn[G.key] !== G.folder) {
+        try { await gfetch('/drive/v3/files/' + fid + '?fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: G.folder }) }); }
+        catch (e) { if (String(e.message) === 'HTTP 404') fid = null; else throw e; }
+      }
+      if (!fid) fid = await mk(G.folder, ids.f.Documents);
+      ids.pf[G.key] = fid; ids.pfn[G.key] = G.folder;
+      for (var di = 0; di < G.docs.length; di++) {
+        var d = G.docs[di], ex = ids.slots[d.slot], sig = d.sig + '|' + d.fileName, id = ex;
+        if (!(ex && ids.sigs[d.slot] === sig)) {
+          try { id = await upl(d.fileName, fid, d.mime, d.b64, ex || null, null, true); }
+          catch (e) { if (ex && String(e.message) === 'HTTP 404') id = await upl(d.fileName, fid, d.mime, d.b64, null, null, true); else throw e; }
+          ids.slots[d.slot] = id; ids.sigs[d.slot] = sig;
+        }
+        if (byId[d.rec] && byId[d.rec].docs && byId[d.rec].docs[d.idx]) byId[d.rec].docs[d.idx].driveId = id;
+      }
+      if (G.csv && G.key.indexOf('veh:') === 0) ids.vsheet[G.key] = await upl('Summary - ' + G.nick, fid, 'text/csv', G.csv, ids.vsheet[G.key], 'application/vnd.google-apps.spreadsheet');
+    }
+    (plan.clear || []).forEach(function (c) { var r = byId[c.rec]; if (r && r.docs && r.docs[c.idx]) delete r.docs[c.idx].driveId; });
+  }
   async function pushAll(user, data) {
     var key = 'vw_drvids_' + user, ids = S.get(key) || {};
     try { await ensureTree(ids); } catch (e) { if (String(e.message) === 'HTTP 404') { ids = {}; await ensureTree(ids); } else throw e; }
     var recs = data.records || [], i, j;
-    for (i = 0; i < recs.length; i++) {
-      var ds = recs[i].docs || [];
-      for (j = 0; j < ds.length; j++) {
-        var m = ds[j].data && !ds[j].driveId ? /^data:([^;]+);base64,(.*)$/.exec(ds[j].data) : null;
-        if (m) ds[j].driveId = await upl(ds[j].name, ids.f.Documents, m[1], m[2], null, null, true);
-      }
-    }
+    await pushPlan(ids, data.plan, recs);
     S.set('vw_r_' + user, recs);
     var savedAt = new Date().toISOString();
     var clean = recs.map(function (r) { return Object.assign({}, r, { docs: (r.docs || []).map(function (d) { return { name: d.name, type: d.type, driveId: d.driveId }; }) }); });

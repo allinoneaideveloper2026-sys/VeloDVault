@@ -1,4 +1,4 @@
-// VV-VERSION 1.9
+// VV-VERSION 1.10
 // Loads the real index.html in a simulated browser, in Android-app mode and in web mode. Run: node tests/app.test.js
 const { JSDOM, VirtualConsole } = require('jsdom'); const fs = require('fs'); const path = require('path'); const { webcrypto } = require('crypto');
 const W = f => fs.readFileSync(path.join(__dirname, '../www', f), 'utf8');
@@ -36,10 +36,10 @@ function load(native, fbmock) {
     beforeParse(w) {
       Object.defineProperty(w, 'crypto', { value: webcrypto });
       w.TextEncoder = TextEncoder; w.TextDecoder = TextDecoder; w.Uint8Array = Uint8Array;
-      w.matchMedia = () => ({ matches: false }); w.Element.prototype.scrollIntoView = function () {}; w.addEventListener('unhandledrejection', e => console.log('   rejected:', String(e.reason && e.reason.stack || e.reason).slice(0, 300)));
+      w.matchMedia = () => ({ matches: false }); w.Element.prototype.scrollIntoView = function () {}; w.Blob.prototype.arrayBuffer = function () { const b = this; return new Promise(r => { const fr = new w.FileReader(); fr.onload = () => r(fr.result); fr.readAsArrayBuffer(b); }); }; w.addEventListener('unhandledrejection', e => console.log('   rejected:', String(e.reason && e.reason.stack || e.reason).slice(0, 300)));
       w.VV_CONFIG = { googleWebClientId: 'x.apps.googleusercontent.com' };
       if (fbmock && !native) w.VVP = { native: false, Firebase: fbmock.F };
-      if (native) w.VVP = { native: true, Firebase: fbmock ? fbmock.F : undefined,
+      if (native) w.VVP = { native: true, Firebase: fbmock ? fbmock.F : undefined, Camera: { Camera: { getPhoto: async o => { w.__cam = o; if (w.__camFail) throw new Error(w.__camFail); return { base64String: '/9j/4AAQSkZJRgABAQEASABIAAD/2wBD', format: 'jpeg' }; } }, CameraResultType: { Base64: 'base64' }, CameraSource: { Camera: 'CAMERA', Photos: 'PHOTOS' } },
         SecureStorage: { get: async k => secure[k] || null, set: async (k, v) => { secure[k] = v; } },
         LocalNotifications: { getPending: async () => ({ notifications: [] }), cancel: async () => {}, schedule: async () => {}, checkPermissions: async () => ({ display: 'granted' }), requestPermissions: async () => ({ display: 'granted' }) },
         BiometricAuth: { checkBiometry: async () => ({ isAvailable: true, deviceIsSecure: true }), authenticate: async () => {} },
@@ -183,8 +183,8 @@ function load(native, fbmock) {
 
   console.log('Setup check (finds why sign-up or Google fails)');
   const modalText = win => win.document.getElementById('mod').innerHTML;
-  await t('the sign-in screen offers the setup check, and it opens before anyone can sign in', async () => {
-    fw.eval("st.user=null;st.mode='signin';draw()"); ok(/run the setup check/i.test(fapp()), 'link on sign-in screen'); fw.eval('setupCheck()'); ok(/Setup check/.test(modalText(fw)) && /Firebase settings/.test(modalText(fw)) && /Google settings/.test(modalText(fw)) && new RegExp('Version ' + fw.eval('APPVER').replace('.', '\\.')).test(modalText(fw)));
+  await t('the setup check is hidden until developer tools are switched on (7 taps), and then works before sign-in', async () => {
+    fw.eval("st.user=null;st.mode='signin';draw()"); ok(!/run the setup check/i.test(fapp()), 'hidden from ordinary users'); for (let i = 0; i < 7; i++) fw.eval('aboutTap()'); ok(/run the setup check/i.test(fapp()), 'seven taps on the footer text turn developer tools on'); fw.eval('setupCheck()'); ok(/Setup check/.test(modalText(fw)) && /Firebase settings/.test(modalText(fw)) && /Google settings/.test(modalText(fw)) && new RegExp('Version ' + fw.eval('APPVER').replace('.', '\\.')).test(modalText(fw)));
   });
   const probe = async (win, resp) => { win.fetch = typeof resp === 'function' ? resp : async () => ({ status: resp.status || 400, json: async () => resp.body }); win.eval('setupCheck()'); await win.eval('runChecks()'); return win.document.getElementById('sc').textContent; };
   await t('Firebase live test: working setup', async () => { ok(/key is valid and Email\/Password sign-in is switched on/.test(await probe(fw, { body: { error: { message: 'INVALID_LOGIN_CREDENTIALS' } } })), 'ok case'); });
@@ -215,6 +215,67 @@ function load(native, fbmock) {
   });
   await t('sign-up errors show the real code instead of a vague message', async () => {
     ok(/Email\/Password/.test(fw.FBAUTH.friendly({ code: 'auth/operation-not-allowed' })), 'known code explained'); ok(/auth\/some-new-thing/.test(fw.FBAUTH.friendly({ code: 'auth/some-new-thing' })), 'unknown code shown');
+  });
+
+  console.log('Camera, documents, display name');
+  const imgDoc = (name, at, data) => ({ name, type: 'image', data: data || 'data:image/jpeg;base64,QUJD', at });
+  await t('Take photo opens the camera directly and never falls back to the gallery picker', async () => {
+    w.eval("st.user='a@b.com';st.tab='add';st.cat='vehicle';st.editId=null;draw()"); let galleryOpened = false; w.document.getElementById('fl').click = () => { galleryOpened = true; };
+    await w.eval('takePhoto()'); ok(w.__cam && w.__cam.source === 'CAMERA' && w.__cam.saveToGallery === false && w.__cam.resultType === 'base64', 'camera options'); ok(!galleryOpened, 'file picker not used');
+    w.document.querySelectorAll('.toast').forEach(n => n.remove()); w.__camFail = 'User cancelled photos app'; await w.eval('takePhoto()'); ok(![...w.document.querySelectorAll('.toast')].length, 'cancelling is silent');
+    w.__camFail = 'Camera permission denied'; await w.eval('takePhoto()'); ok(/Camera permission denied/.test([...w.document.querySelectorAll('.toast')].map(n => n.textContent).join(' ')), 'real reason shown'); w.__camFail = '';
+  });
+  await t('attaching a document does NOT invent sample values in the form', async () => {
+    w.eval("st.cat='vehicle';st.docs=[];draw()"); w.eval("scanFile(new File(['%PDF-1.4 hello world test'],'rc.pdf',{type:'application/pdf'}))");
+    await wait(() => /Attached/.test(w.document.getElementById('pv').textContent) && w.eval('st.docs.length') === 1);
+    ok(w.document.getElementById('f_reg').value === '' && w.document.getElementById('f_owner').value === '', 'no demo values'); ok(!/Demo scan|sample values/i.test(w.document.getElementById('pv').textContent)); ok(/^\d{4}-\d{2}-\d{2}/.test(w.eval('st.docs[0].at')), 'attach time recorded');
+    ok(!/auto-fill with AI/i.test(app()) && /Attach documents/.test(app()), 'wording is honest');
+  });
+  await t('greeting uses a name the user chooses, not the email', async () => {
+    w.eval("st.tab='home';draw()"); ok(/Hello A 👋/.test(app()) && !/Hello a@b\.com/.test(app()), 'default is the part before @');
+    w.eval("st.tab='more';draw()"); ok(/Your name/.test(app())); w.eval('askName()'); w.document.getElementById('nm').value = 'Don'; w.eval('saveName()');
+    w.eval("st.tab='home';draw()"); ok(/Hello Don 👋/.test(app()), 'custom name shown'); w.eval("st.tab='more';draw()"); ok(/<b>Don<\/b>/.test(app()) && /a@b\.com/.test(app()), 'profile shows name and email');
+    w.eval('askName()'); w.document.getElementById('nm').value = '<img src=x onerror=1>'; w.eval('saveName()'); w.eval("st.tab='home';draw()"); ok(!/<img src=x/.test(app()) && /Hello img srcx onerror1/.test(app()), 'unsafe characters removed');
+    w.eval('askName()'); w.document.getElementById('nm').value = '   '; w.eval('saveName()'); ok(/Enter a name/.test(w.document.getElementById('mod').innerHTML), 'empty refused'); w.eval('clearName()'); w.eval("st.tab='home';draw()"); ok(/Hello A 👋/.test(app()), 'back to default');
+    ok(w.eval("S.get('vw_name_other@x.com')") == null, 'name belongs to one account');
+  });
+  const vrec = (id, nick, reg, docs) => ({ id, c: 'vehicle', d: { name: nick, reg, make: 'Yamaha', model: 'Fascino', fuel: 'Petrol', regdate: '2016-06-12', expiry: '2031-06-12', extra: {} }, created: '2026-01-01 09:00', edited: null, docs: docs || [] });
+  const lrec = (id, c, key, d, created, docs) => ({ id, c, d: Object.assign({ name: key, extra: {} }, d), created, edited: null, docs: docs || [] });
+  const seed = () => w.eval('S.set("vw_r_a@b.com",' + JSON.stringify([
+    vrec('v1', 'Fascino', 'KA01HQ5468', [imgDoc('rc.jpg', '2026-01-02 10:00')]), vrec('v2', 'Tiago', 'KA01MP5284'),
+    lrec('i1', 'insurance', 'Fascino · KA01HQ5468', { provider: '=cmd|calc', ptype: 'Comprehensive', policy: 'P1', start: '2025-01-01', expiry: '2026-01-01' }, '2025-01-01 10:00', [imgDoc('old.jpg', '2025-01-01 10:00')]),
+    lrec('i2', 'insurance', 'Fascino · KA01HQ5468', { provider: 'Acko', ptype: 'Comprehensive', policy: 'P2', start: '2026-01-01', expiry: '2027-01-01' }, '2026-11-01 10:00', [imgDoc('new.jpg', '2026-11-01 10:00'), imgDoc('page2.jpg', '2026-11-01 10:01')]),
+    lrec('p1', 'puc', 'Fascino · KA01HQ5468', { center: 'C', issue: '2026-07-01', expiry: '2027-07-01' }, '2026-07-01 10:00', [{ name: 'puc.pdf', type: 'pdf', data: 'data:application/pdf;base64,JVBERi0=', at: '2026-07-02 08:00' }]),
+    lrec('p2', 'puc', 'Tiago · KA01MP5284', { center: 'C', issue: '2026-08-01', expiry: '2027-08-01' }, '2026-08-01 10:00', [imgDoc('t.jpg', '2026-08-03 09:00')]),
+    lrec('e1', 'expense', 'Fascino · KA01HQ5468', { kind: 'Service', amount: '1850', date: '2026-10-10', note: 'Oil change' }, '2026-10-10 10:00', [imgDoc('bill.jpg', '2026-10-10 10:05')]),
+    { id: 'd1', c: 'dl', d: { name: 'Don', dlno: 'KA25', classes: 'MCWG', expiry: '2036-02-15', extra: {} }, created: '2026-02-01 10:00', edited: null, docs: [imgDoc('dl.jpg', '2026-02-02 10:00')] },
+    { id: 'c1', c: 'custom', d: { cat: 'House rent', name: 'Flat 2B', note: '', expiry: '', extra: {} }, created: '2026-03-01 10:00', edited: null, docs: [imgDoc('agreement.jpg', '2026-03-02 10:00')] }]) + ')');
+  const plan = () => JSON.parse(w.eval('JSON.stringify(docPlan(recs()))'));
+  await t('Drive plan: one folder per vehicle, files named Nickname_Type_Date', async () => {
+    seed(); const p = plan(), g1 = p.groups.find(g => g.key === 'veh:v1'), g2 = p.groups.find(g => g.key === 'veh:v2');
+    ok(g1.folder === 'Fascino KA01HQ5468' && g2.folder === 'Tiago KA01MP5284', 'folder per vehicle: ' + g1.folder);
+    const names = g1.docs.map(d => d.fileName).sort(); ok(names.includes('Fascino_RC_2026-01-02.jpg') && names.includes('Fascino_PUC_2026-07-02.pdf') && names.includes('Fascino_Receipt-Service_2026-10-10.jpg'), names.join());
+    ok(g2.docs.length === 1 && g2.docs[0].fileName === 'Tiago_PUC_2026-08-03.jpg', 'second vehicle has its own files');
+  });
+  await t('Drive plan: a new upload of the same type for the same vehicle replaces the old one', async () => {
+    const g1 = plan().groups.find(g => g.key === 'veh:v1'), ins = g1.docs.filter(d => /Insurance/.test(d.fileName));
+    ok(ins.length === 2 && ins.every(d => d.rec === 'i2') && ins[0].fileName === 'Fascino_Insurance_2026-11-01.jpg' && ins[1].fileName === 'Fascino_Insurance_2026-11-01_2.jpg', 'only the latest insurance, pages numbered: ' + ins.map(d => d.fileName));
+    ok(g1.docs.every(d => d.rec !== 'i1'), 'older insurance not kept'); ok(plan().clear.some(c => c.rec === 'i1' && c.idx === 0), 'older document told to drop its Drive link'); ok(ins[0].slot === 'veh:v1|Insurance|0', 'stable slot id');
+  });
+  await t('Drive plan: licence goes to Personal, other custom records to Other, nothing is lost', async () => {
+    const p = plan(), per = p.groups.find(g => g.key === 'personal'), oth = p.groups.find(g => g.key === 'other');
+    ok(per.folder === 'Personal' && per.docs[0].fileName === 'Don_DL_2026-02-02.jpg', 'licence'); ok(oth.folder === 'Other' && /Flat 2B_Custom-House rent-c1_2026-03-02\.jpg/.test(oth.docs[0].fileName), 'custom: ' + oth.docs[0].fileName);
+  });
+  await t('vehicle summary sheet lists the papers, with the document file name and formula protection', async () => {
+    const csv = plan().groups.find(g => g.key === 'veh:v1').csv; ok(/^\ufeff"Item","Details"/.test(csv)); ok(/"Vehicle \(RC\)","Yamaha Fascino · Petrol","KA01HQ5468"/.test(csv), 'vehicle row'); ok(/"Insurance","Acko · Comprehensive","P2".*"Fascino_Insurance_2026-11-01\.jpg"/.test(csv), 'latest insurance with file name');
+    ok(/"Insurance","'=cmd\|calc/.test(csv), 'formula neutralised'); ok(/"Expense: Service","Oil change".*"1850"/.test(csv), 'expense row');
+  });
+  await t('driveData carries the plan, so sync needs nothing else', async () => { const d = w.eval('driveData()'); ok(d.plan && d.plan.groups.length >= 4 && Array.isArray(d.plan.clear)); });
+  await t('My vehicles links to a common documents view, with the Drive folder when connected', async () => {
+    w.eval("st.tab='home';draw()"); ok(/📎 Documents/.test(app()) && /View \(\d+\)/.test(app()), 'link on the vehicle card'); w.eval("S.set('vw_drvids_a@b.com',{pf:{'veh:v1':'FOLDER123'}})");
+    w.eval("vehDocs('v1')"); const m = w.document.getElementById('mod').innerHTML; ok(/Documents: Fascino/.test(m) && /RC · rc\.jpg/.test(m) && /Insurance · new\.jpg/.test(m) && /PUC · puc\.pdf/.test(m) && /Receipt-Service · bill\.jpg/.test(m), 'all of this vehicle\'s documents'); ok(!/Tiago|t\.jpg/.test(m), 'only this vehicle');
+    ok(/drive\.google\.com\/drive\/folders\/FOLDER123/.test(m), 'open folder in Drive'); ok(/only the latest document of each type is kept/i.test(m), 'tells the user about replacement');
+    w.eval("S.del('vw_drvids_a@b.com')"); w.eval("vehDocs('v1')"); ok(!/drive\.google\.com/.test(w.document.getElementById('mod').innerHTML), 'no Drive link before Drive is connected');
   });
 
   console.log('Web mode (browser)');

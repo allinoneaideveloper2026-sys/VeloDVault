@@ -1,4 +1,4 @@
-/* VV-VERSION 1.9 */
+/* VV-VERSION 1.10 */
 /* VeloDVault sign-in with Firebase Authentication (email verification, password reset, sign-in on any device).
    Firebase holds only the email, the password hash and an account id. Records stay on the phone and in the user's own Drive. */
 (function () {
